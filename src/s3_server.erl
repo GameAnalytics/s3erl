@@ -23,10 +23,7 @@
 -record(state, {config, workers, counters}).
 
 
-%%
 %% API
-%%
-
 start_link(Config) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Config, []).
 
@@ -49,10 +46,7 @@ get_config() ->
     gen_server:call(?MODULE, get_config).
 
 
-%%====================================================================
 %% gen_server callbacks
-%%====================================================================
-
 init(Config) ->
     process_flag(trap_exit, true),
 
@@ -120,10 +114,7 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-%%--------------------------------------------------------------------
 %%% Internal functions
-%%--------------------------------------------------------------------
-
 v(Key, Data) ->
     proplists:get_value(Key, Data).
 
