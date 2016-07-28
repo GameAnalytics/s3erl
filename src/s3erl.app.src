@@ -1,13 +1,16 @@
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 {application, s3erl,
  [
   {description, "s3erl app"},
   {vsn, "0.1.0"},
-  {registered, []},
+  {registered, [s3_sup,
+                s3_server]},
   {applications, [kernel,
                   stdlib,
                   inets,
                   xmerl,
                   lhttpc
                  ]},
+  {mod, {s3_app, []}},
   {env, [{retries, 5},{retry_delay, 50},{timeout, 1000},{worker, 50}]}
  ]}.
