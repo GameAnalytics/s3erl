@@ -1,6 +1,9 @@
 -module(s3_test).
 -include_lib("eunit/include/eunit.hrl").
 
+-define(assertContain(Sub, List), ?assert(does_contain(Sub, List))).
+-define(assertS3List(Sub, S3Response), ?assertContain(Sub, ext_list(S3Response))).
+
 integration_test_() ->
     {foreach,
      fun setup/0, fun teardown/1,
@@ -17,20 +20,12 @@ integration_test_() ->
      ]}.
 
 setup() ->
-    application:start(asn1),
-    application:start(crypto),
-    application:start(public_key),
-    application:start(ssl),
-    application:start(lhttpc),
-    {ok, Pid} = s3_server:start_link(default_config()),
-    [Pid].
+    application:set_env(s3erl, s3_config, default_config()),
+    s3_app:start(),
+    ok.
 
-teardown(Pids) ->
-    [begin unlink(P), exit(P, kill) end || P <- Pids].
-
-
-
-
+teardown(_) ->
+    s3_app:stop().
 
 get_put() ->
     delete_if_existing(bucket(), <<"foo">>),
@@ -52,9 +47,11 @@ concurrency_limit() ->
     Parent = self(),
     MaxConcurrencyCB = fun (N) -> Parent ! {max_concurrency, N} end,
 
-    s3_server:stop(),
-    s3_server:start_link([{max_concurrency_callback, MaxConcurrencyCB},
-                          {max_concurrency, 3}] ++ default_config()),
+    s3_app:stop(),
+    application:set_env(s3erl, s3_config, [{max_concurrency_callback, MaxConcurrencyCB},
+                                           {max_concurrency, 3}] ++ default_config()),
+
+    s3_app:start(),
 
     meck:new(s3_lib),
     GetF = fun (_, _, _, _) -> timer:sleep(50), {ok, <<"bazbar">>} end,
@@ -84,10 +81,11 @@ timeout_retry() ->
     RetryCb = fun (Reason, Attempt) ->
                       Parent ! {Reason, Attempt}
               end,
-    s3_server:stop(),
-    s3_server:start_link([{timeout, 10},
-                          {retry_callback, RetryCb},
-                          {retry_delay, 10}] ++ default_config()),
+    s3_app:stop(),
+    application:set_env(s3erl, s3_config, [{timeout, 10},
+                                           {retry_callback, RetryCb},
+                                           {retry_delay, 10}] ++ default_config()),
+    s3_app:start(),
 
     meck:new(lhttpc),
     TimeoutF = fun (_, _, _, _, _, _) ->
@@ -95,8 +93,6 @@ timeout_retry() ->
                        {error, timeout}
                end,
     meck:expect(lhttpc, request, TimeoutF),
-    %% meck:expect(lhttpc, request, TimeoutF),
-    %% meck:expect(lhttpc, request, TimeoutF),
 
     ?assertEqual({error, timeout}, s3:get(bucket(), <<"foo">>)),
 
@@ -111,10 +107,11 @@ timeout_retry() ->
 slow_endpoint() ->
     Port = webserver:start(gen_tcp, [fun very_slow_response/5]),
 
-    s3_server:stop(),
-    s3_server:start_link([{timeout, 10},
-                          {endpoint, "localhost:" ++ integer_to_list(Port)},
-                          {retry_delay, 10}] ++ default_config()),
+    s3_app:stop(),
+    application:set_env(s3erl, s3_config, [{timeout, 10},
+                                           {endpoint, "localhost:" ++ integer_to_list(Port)},
+                                           {retry_delay, 10}] ++ default_config()),
+    s3_app:start(),
 
     ?assertEqual({error, timeout}, s3:get(bucket(), <<"foo">>, 100)).
 
@@ -125,16 +122,16 @@ list_objects() ->
     {ok, _} = s3:put(bucket(), "2/1", "foo", "text/plain"),
 
 
-    ?assertEqual({ok, [<<"1/1">>, <<"1/2">>, <<"1/3">>]},
-                 s3:list(bucket(), "1/", 10, "")),
+    ?assertS3List([<<"1/1">>, <<"1/2">>, <<"1/3">>],
+                   s3:list(bucket(), "1/", 10, "")),
 
-    ?assertEqual({ok, [<<"1/3">>]},
-                 s3:list(bucket(), "1/", 10, "1/2")),
+    ?assertS3List([<<"1/3">>],
+                  s3:list(bucket(), "1/", 10, "1/2")),
 
     %% List all, includes keys from other tests.
-    ?assertEqual({ok, [<<"1/1">>, <<"1/2">>, <<"1/3">>, <<"2/1">>,
-                       <<"foo">>, <<"foo-copy">>]},
-                 s3:list(bucket(), "", 10, "")).
+    ?assertS3List([<<"1/1">>, <<"1/2">>, <<"1/3">>, <<"2/1">>,
+                   <<"foo">>, <<"foo-copy">>],
+                  s3:list(bucket(), "", 10, "")).
 
 fold() ->
     %% Depends on earlier tests to setup data.
@@ -142,24 +139,17 @@ fold() ->
                  s3:fold(bucket(), "1/", fun(Key, Acc) -> [Key|Acc] end, [])),
 
      %% List all, includes keys from other tests.
-    ?assertEqual([<<"foo-copy">>, <<"foo">>, <<"2/1">>, <<"1/3">>, <<"1/2">>,
-                  <<"1/1">>],
-                 s3:fold(bucket(), "", fun(Key, Acc) -> [Key|Acc] end, [])).
+    ?assertContain([<<"foo-copy">>, <<"foo">>, <<"2/1">>, <<"1/3">>, <<"1/2">>,
+                    <<"1/1">>],
+                   s3:fold(bucket(), "", fun(Key, Acc) -> [Key|Acc] end, [])).
 
 callback_test() ->
-    application:start(asn1),
-    application:start(crypto),
-    application:start(public_key),
-    application:start(ssl),
-    application:start(lhttpc),
-
     Parent = self(),
     F = fun (Request, Response, ElapsedUs) ->
                 Parent ! {Request, Response, ElapsedUs}
         end,
-
-    {ok, _} = s3_server:start_link([{post_request_callback, F} | credentials()]),
-
+    application:set_env(s3erl, s3_config, [{post_request_callback, F} | credentials()]),
+    s3_app:start(),
 
     {ok, _} = s3:put(bucket(), "foo", "bar", "text/plain"),
     {ok, _} = s3:get(bucket(), "foo"),
@@ -181,7 +171,7 @@ callback_test() ->
             end()
     end,
 
-    s3_server:stop().
+    s3_app:stop().
 
 signed_url() ->
     delete_if_existing(bucket(), <<"foo">>),
@@ -203,10 +193,7 @@ reload_config() ->
     ?assertNotEqual(OldConfig, s3_server:get_config()).
 
 
-%%
 %% HELPERS
-%%
-
 very_slow_response(Module, Socket, _, _, _) ->
     timer:sleep(100),
     Module:send(
@@ -240,3 +227,12 @@ bucket() ->
     File = filename:join([code:priv_dir(s3erl), "bucket.term"]),
     {ok, Config} = file:consult(File),
     proplists:get_value(bucket, Config).
+
+ext_list({ok, List}) when is_list(List) ->
+    List.
+
+does_contain(Sub, List) when is_list(Sub),
+                             is_list(List) ->
+    lists:all(fun(E) -> lists:member(E, List) end, Sub) orelse
+        [{sublist, Sub},
+         {list, List}].
