@@ -130,22 +130,30 @@ v(Key, Data) ->
 v(Key, Data, Default) ->
     proplists:get_value(Key, Data, Default).
 
+v_fun(Key, Data, Default) ->
+    case proplists:get_value(Key, Data, Default) of
+        {Mod, Fun, Arity} ->
+            fun Mod:Fun/Arity;
+        Fun when is_function(Fun) ->
+            Fun
+    end.
+
 create_config(Config) ->
     AccessKey        = v(access_key, Config),
     SecretAccessKey  = v(secret_access_key, Config),
     Endpoint         = v(endpoint, Config),
 
     Timeout          = v(timeout, Config, 1500),
-    RetryCallback    = v(retry_callback, Config,
-                         fun ?MODULE:default_retry_cb/2),
     MaxRetries       = v(max_retries, Config, 3),
     RetryDelay       = v(retry_delay, Config, 500),
     MaxConcurrency   = v(max_concurrency, Config, 50),
-    MaxConcurrencyCB = v(max_concurrency_callback, Config,
-                         fun ?MODULE:default_max_concurrency_cb/1),
-    PostRequestCB    = v(post_request_callback, Config,
-                         fun ?MODULE:default_post_request_cb/3),
     ReturnHeaders    = v(return_headers, Config, false),
+
+    RetryCallback    = v_fun(retry_callback, Config, fun ?MODULE:default_retry_cb/2),
+    MaxConcurrencyCB = v_fun(max_concurrency_callback, Config,
+                             fun ?MODULE:default_max_concurrency_cb/1),
+    PostRequestCB    = v_fun(post_request_callback, Config,
+                             fun ?MODULE:default_post_request_cb/3),
 
     #config{access_key         = AccessKey,
             secret_access_key  = SecretAccessKey,
