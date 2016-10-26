@@ -146,7 +146,7 @@ do_request(Url, Method, Headers, Body, Timeout, Options) ->
             {ok, not_found};
         {ok, {{307, "Temporary Redirect" ++ _}, ResponseHeaders, _ResponseBody}} ->
             {"Location", Location} = lists:keyfind("Location", 1, ResponseHeaders),
-            do_request(Location, Method, Headers, Body, Timeout, Options);
+            {error, {redirect, Url, Location}};
         {ok, {{404, "Not Found" ++ _}, _, _}} ->
             {ok, not_found};
         {ok, {Code, _ResponseHeaders, <<>>}} ->

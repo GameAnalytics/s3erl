@@ -172,11 +172,13 @@ handle_request(Req, C, StartTs, Attempts) ->
                               Reason =:= connection_closed orelse
                               Reason =:= timeout) ->
             catch (C#config.retry_callback)(Reason, Attempts),
+            error_logger:error_msg("Retry due:~p on request ~p", [Reason, Req]),
             timer:sleep(C#config.retry_delay),
             handle_request(Req, C, StartTs, Attempts + 1);
 
         {'EXIT', {econnrefused, _}} when Attempts < C#config.max_retries ->
             catch (C#config.retry_callback)(econnrefused, Attempts),
+            error_logger:error_msg("Retry due:econnrefused on request ~p", [Req]),
             timer:sleep(C#config.retry_delay),
             handle_request(Req, C, StartTs, Attempts + 1);
 
@@ -190,6 +192,7 @@ handle_request(Req, C, StartTs, Attempts) ->
             case Retry of
                 true ->
                     catch (C#config.retry_callback)(internal_error, Attempts),
+                    error_logger:error_msg("Retry due:~p on request ~p", [Error, Req]),
                     timer:sleep(C#config.retry_delay),
                     handle_request(Req, C, StartTs, Attempts + 1);
                 false ->
