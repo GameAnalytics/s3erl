@@ -146,7 +146,8 @@ do_request(Url, Method, Headers, Body, Timeout, Options) ->
             {ok, not_found};
         {ok, {{307, "Temporary Redirect" ++ _}, ResponseHeaders, _ResponseBody}} ->
             {"Location", Location} = lists:keyfind("Location", 1, ResponseHeaders),
-            {error, {redirect, Url, Location}};
+            error_logger:error_msg("S3 redirecting ~p to ~p", [Url, Location]),
+            do_request(Location, Method, Headers, Body, Timeout, Options);
         {ok, {{404, "Not Found" ++ _}, _, _}} ->
             {ok, not_found};
         {ok, {Code, _ResponseHeaders, <<>>}} ->
