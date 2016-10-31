@@ -63,7 +63,16 @@ handle_call({request, Req}, From, #state{config = C} = State)
   when length(State#state.workers) < C#config.max_concurrency ->
     WorkerPid =
         spawn_link(fun() ->
-                           gen_server:reply(From, handle_request(Req, C))
+                           try gen_server:reply(From, handle_request(Req, C)) of
+                               Result ->
+                                   Result
+                           catch
+                               E:R ->
+                                   ST = erlang:get_stacktrace(),
+                                   error_logger:error_msg("S3 handler process died due: ~p:~p stacktrace:~p",
+                                                          [E,R,ST]),
+                                   exit(R)
+                           end
                    end),
     NewState = State#state{workers = [WorkerPid | State#state.workers],
                            counters = update_counters(Req, State#state.counters)},
