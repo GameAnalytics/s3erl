@@ -34,13 +34,18 @@ delete(Config, Bucket, Key) ->
 list(Config, Bucket, Prefix, MaxKeys, Marker) ->
     Key = ["?", "prefix=", Prefix, "&", "max-keys=", MaxKeys, "&marker=", Marker],
     case request(Config, get, Bucket, lists:flatten(Key), [], <<>>) of
-        {ok, _Headers, Body} ->
+        {ok, RespHeaders, Body} ->
             {XmlDoc, _Rest} = xmerl_scan:string(binary_to_list(Body)),
             Keys = lists:map(fun (#xmlText{value = K}) -> list_to_binary(K) end,
                              xmerl_xpath:string(
                                "/ListBucketResult/Contents/Key/text()", XmlDoc)),
 
-            {ok, Keys};
+            case Config#config.return_headers of
+                true ->
+                    {ok, RespHeaders, Keys};
+                false ->
+                    {ok, Keys}
+            end;
         {ok, not_found} ->
             {ok, not_found};
         {error, _} = Error ->

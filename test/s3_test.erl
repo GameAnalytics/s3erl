@@ -16,20 +16,29 @@ integration_test_() ->
       ?_test(reload_config())
      ]}.
 
-setup() ->
+integration_headers_test_() ->
+    {foreach,
+     fun setup_w_headers/0,
+     fun teardown/1,
+     [
+      ?_test(get_with_headers()),
+      ?_test(list_with_headers())
+     ]}.
+
+setup() -> setup_opt([]).
+setup_w_headers() -> setup_opt([{return_headers, true}]).
+
+setup_opt(Config) ->
     application:start(asn1),
     application:start(crypto),
     application:start(public_key),
     application:start(ssl),
     application:start(lhttpc),
-    {ok, Pid} = s3_server:start_link(default_config()),
+    {ok, Pid} = s3_server:start_link(default_config() ++ Config),
     [Pid].
 
 teardown(Pids) ->
     [begin unlink(P), exit(P, kill) end || P <- Pids].
-
-
-
 
 
 get_put() ->
@@ -136,6 +145,28 @@ list_objects() ->
                        <<"foo">>, <<"foo-copy">>]},
                  s3:list(bucket(), "", 10, "")).
 
+get_with_headers() ->
+    delete_if_existing(bucket(), <<"foo">>),
+    Value = <<"1/1">>,
+
+    ?assertMatch({ok, _}, s3:put(bucket(), <<"foo">>, Value, "text/plain")),
+
+    ?assertMatch({ok, _, Value}, s3:get(bucket(), <<"foo">>)),
+    {ok, Headers, Value} = s3:get(bucket(), <<"foo">>),
+
+    ?assertEqual(true, header_exists("x-amz-request-id", Headers)),
+    ?assertEqual(true, header_exists("x-amz-id-2", Headers)).
+
+list_with_headers() ->
+    {ok, _} = s3:put(bucket(), "1/1", "foo", "text/plain"),
+    {ok, _} = s3:put(bucket(), "1/2", "foo", "text/plain"),
+    {ok, _} = s3:put(bucket(), "1/3", "foo", "text/plain"),
+    {ok, _} = s3:put(bucket(), "2/1", "foo", "text/plain"),
+
+    {ok, Headers, _Values} = s3:list(bucket(), "1/", 10, ""),
+    ?assertEqual(true, header_exists("x-amz-request-id", Headers)),
+    ?assertEqual(true, header_exists("x-amz-id-2", Headers)).
+
 fold() ->
     %% Depends on earlier tests to setup data.
     ?assertEqual([<<"1/3">>, <<"1/2">>, <<"1/1">>],
@@ -220,6 +251,8 @@ delete_if_existing(Bucket, Key) ->
     case s3:get(Bucket, Key) of
         {ok, not_found} ->
             ok;
+        {ok, _Headers, _Doc} ->
+            {ok, _} = s3:delete(Bucket, Key);
         {ok, _Doc} ->
             {ok, _} = s3:delete(Bucket, Key)
     end.
@@ -240,3 +273,6 @@ bucket() ->
     File = filename:join([code:priv_dir(s3erl), "bucket.term"]),
     {ok, Config} = file:consult(File),
     proplists:get_value(bucket, Config).
+
+header_exists(K, Hdrs) -> proplists:is_defined(K, lowercase(Hdrs)).
+lowercase(Hdrs) -> [{string:to_lower(K), V} || {K, V} <- Hdrs].
