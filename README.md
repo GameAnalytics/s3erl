@@ -28,23 +28,22 @@ Limitations:
 
 ## Usage
 
-Currently, you must add the `s3_server` to your own supervisor tree,
-as `s3erl` does not include it's own supervisor.
+In your sys.config declare a configuration for s3erl with key `s3_config`
 
 ```erlang
-s3_spec() ->
-    Options =
-        [{timeout, 15000},
-         {max_concurrency, 500},
-         {retry_callback, fun my_module:s3_retry_callback/2},
-         {post_request_callback, fun my_module:s3_post_request_callback/3},
-         {access_key, "foobar"},
-         {secret_access_key, "secret"}],
-
-    {s3, {s3_server, start_link, [Options]},
-     permanent, 5000, worker, []}.
+ {s3erl,
+  [{s3_config,
+    [
+     {access_key, "access_key"},
+     {secret_access_key, "secret_access_key"},
+     {timeout, 15000},
+     {max_retries, 15},
+     {max_concurrency, 10}
+    ]
+   }
+  ]
+ }
 ```
-
 You can of course also start `s3_server` from the shell for
 experimenting, like this:
 `s3_server:start_link([{access_key, "..."}, {secret_access_key, "..."}])`
