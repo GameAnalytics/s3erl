@@ -12,7 +12,6 @@ integration_test_() ->
       ?_test(concurrency_limit()),
       ?_test(timeout_retry()),
       ?_test(slow_endpoint()),
-      ?_test(permission_denied()),
       ?_test(fold()),
       ?_test(list_objects()),
       ?_test(signed_url()),
@@ -38,10 +37,6 @@ get_put() ->
 
     ?assertMatch({ok, _}, s3:put(bucket(), <<"foo-copy">>, <<>>, "text/plain",
                                  5000, [{"x-amz-copy-source", bucket() ++ "/foo"}])).
-
-permission_denied() ->
-    ?assertEqual({error, {"AccessDenied", "Access Denied"}},
-                 s3:put("foobar", <<"foo">>, <<"bazbar">>, "text/plain")).
 
 concurrency_limit() ->
     Parent = self(),
@@ -148,7 +143,7 @@ callback_test() ->
     F = fun (Request, Response, ElapsedUs) ->
                 Parent ! {Request, Response, ElapsedUs}
         end,
-    application:set_env(s3erl, s3_config, [{post_request_callback, F} | credentials()]),
+    application:set_env(s3erl, s3_config, [{post_request_callback, F} | default_config()]),
     s3_app:start(),
 
     {ok, _} = s3:put(bucket(), "foo", "bar", "text/plain"),
@@ -212,16 +207,13 @@ delete_if_existing(Bucket, Key) ->
     end.
 
 default_config() ->
-    credentials().
+    [{endpoint, "localhost:4569"} | credentials()].
 
 credentials() ->
-    File = filename:join([code:priv_dir(s3erl), "s3_credentials.term"]),
-    case file:consult(File) of
-        {ok, Cred} ->
-            Cred;
-        {error, enoent} ->
-            throw({error, missing_s3_credentials})
-    end.
+    [
+     {access_key, "access_key"},
+     {secret_access_key, "secret_access_key"}
+    ].
 
 bucket() ->
     File = filename:join([code:priv_dir(s3erl), "bucket.term"]),
