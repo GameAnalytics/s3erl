@@ -129,6 +129,10 @@ list_objects() ->
                   s3:list(bucket(), "", 10, "")).
 
 fold() ->
+        {ok, _} = s3:put(bucket(), "1/1", "foo", "text/plain"),
+        {ok, _} = s3:put(bucket(), "1/2", "foo", "text/plain"),
+        {ok, _} = s3:put(bucket(), "1/3", "foo", "text/plain"),
+        {ok, _} = s3:put(bucket(), "2/1", "foo", "text/plain"),
     %% Depends on earlier tests to setup data.
     ?assertEqual([<<"1/3">>, <<"1/2">>, <<"1/1">>],
                  s3:fold(bucket(), "1/", fun(Key, Acc) -> [Key|Acc] end, [])),
