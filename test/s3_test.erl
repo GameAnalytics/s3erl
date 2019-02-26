@@ -82,12 +82,12 @@ timeout_retry() ->
                                            {retry_delay, 10}] ++ default_config()),
     s3_app:start(),
 
-    meck:new(lhttpc),
-    TimeoutF = fun (_, _, _, _, _, _) ->
+    meck:new(httpc),
+    TimeoutF = fun (_, _, _, _) ->
                        timer:sleep(50),
                        {error, timeout}
                end,
-    meck:expect(lhttpc, request, TimeoutF),
+    meck:expect(httpc, request, TimeoutF),
 
     ?assertEqual({error, timeout}, s3:get(bucket(), <<"foo">>)),
 
@@ -96,8 +96,8 @@ timeout_retry() ->
     receive M3 -> ?assertEqual({timeout, 2}, M3) end,
     receive _  -> ?assert(false) after 1 -> ok end,
 
-    ?assert(meck:validate(lhttpc)),
-    meck:unload(lhttpc).
+    ?assert(meck:validate(httpc)),
+    meck:unload(httpc).
 
 slow_endpoint() ->
     Port = webserver:start(gen_tcp, [fun very_slow_response/5]),
@@ -173,17 +173,17 @@ callback_test() ->
     s3_app:stop().
 
 signed_url() ->
-    delete_if_existing(bucket(), <<"foo">>),
-    ?assertEqual({ok, not_found}, s3:get(bucket(), <<"foo">>)),
-    {ok, _} = s3:put(bucket(), <<"foo">>, <<"signed_test">>, "text/plain"),
+    delete_if_existing(bucket(), <<"sig">>),
+    ?assertEqual({ok, not_found}, s3:get(bucket(), <<"sig">>)),
+    {ok, _} = s3:put(bucket(), <<"sig">>, <<"signed_test">>, "text/plain"),
 
     {MegaSeconds, Seconds, _} = os:timestamp(),
     Expires = MegaSeconds * 1000000 + Seconds,
-    Url = s3:signed_url(bucket(), <<"foo">>, Expires + 3600),
+    Url = s3:signed_url(bucket(), <<"sig">>, Expires + 3600),
 
     ?assertMatch(
-       {ok, {{200, _}, _, <<"signed_test">>}},
-       lhttpc:request(Url, get, [], [], 5000, [])
+       {ok, {{_, 200, _}, _, "signed_test"}},
+       httpc:request(Url)
       ).
 
 reload_config() ->
