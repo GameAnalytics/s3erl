@@ -2,14 +2,13 @@
 {application, s3erl,
  [
   {description, "s3erl app"},
-  {vsn, "1"},
+  {vsn, "1.1"},
   {registered, [s3_sup,
                 s3_server]},
   {applications, [kernel,
                   stdlib,
                   inets,
-                  xmerl,
-                  lhttpc
+                  xmerl
                  ]},
   {mod, {s3_app, []}},
   {env, [{retries, 5},{retry_delay, 50},{timeout, 1000},{worker, 50}]}

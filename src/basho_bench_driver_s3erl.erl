@@ -13,7 +13,6 @@ new(_Id) ->
     application:start(crypto),
     application:start(public_key),
     application:start(ssl),
-    application:start(lhttpc),
 
     File = filename:join([code:priv_dir(s3erl), "s3_credentials.term"]),
     {ok, Cred} = file:consult(File),
