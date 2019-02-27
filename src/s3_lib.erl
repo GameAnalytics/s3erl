@@ -68,8 +68,8 @@ signed_url(Config, Bucket, Key, Method, Expires) ->
 do_put(Config, Bucket, Key, Value, Headers) ->
     case request(Config, put, Bucket, Key, Headers, Value) of
         {ok, RespHeaders, Body} ->
-            case lists:keyfind("Etag", 1, RespHeaders) of
-                {"Etag", Etag} ->
+            case lists:keyfind("etag", 1, RespHeaders) of
+                {"etag", Etag} ->
                     %% for objects
                     {ok, Etag};
                 false when Key == "" andalso Value == "" ->
@@ -108,21 +108,23 @@ do_delete(Config, Bucket, Key) ->
 %%--------------------------------------------------------------------
 
 build_host(Bucket) ->
-    [Bucket, ".s3.amazonaws.com"].
+    [to_list(Bucket), ".s3.amazonaws.com"].
 
 build_host(Endpoint, Bucket) ->
-    [Endpoint, "/", Bucket].
+    [Endpoint, "/", to_list(Bucket)].
 
 build_url(undefined, Bucket, Path) ->
     lists:flatten(["http://", build_host(Bucket), "/", Path]);
 build_url(Endpoint, _Bucket, Path) ->
-    lists:flatten(["http://", Endpoint, "/", Path]).
+    lists:flatten(["http://", Endpoint, "/", to_list(Path)]).
 
 build_full_url(undefined, Bucket, Path) ->
-    lists:flatten(["http://", build_host(Bucket), "/", Path]);
+    lists:flatten(["http://", build_host(Bucket), "/", to_list(Path)]);
 build_full_url(Endpoint, Bucket, Path) ->
-    lists:flatten(["http://", build_host(Endpoint, Bucket), "/", Path]).
+    lists:flatten(["http://", build_host(Endpoint, Bucket), "/", to_list(Path)]).
 
+request(Config, Method, Bucket, Path, Headers, Body) when is_list(Body) ->
+    request(Config, Method, Bucket, Path, Headers, list_to_binary(Body));
 request(Config, Method, Bucket, Path, Headers, Body) ->
     Date = httpd_util:rfc1123_date(),
     Url = build_url(Config#config.endpoint, Bucket, Path),
@@ -142,21 +144,23 @@ request(Config, Method, Bucket, Path, Headers, Body) ->
                    {"Date", Date},
                    {"Connection", "keep-alive"}
                    | Headers],
-    Options = [{max_connections, Config#config.max_concurrency}],
-    do_request(Url, Method, FullHeaders, Body, Config#config.timeout, Options).
+    do_request(Url, Method, FullHeaders, Body, Config#config.timeout).
 
-do_request(Url, Method, Headers, Body, Timeout, Options) ->
-    case lhttpc:request(Url, Method, Headers, Body, Timeout, Options) of
-        {ok, {{200, _}, ResponseHeaders, ResponseBody}} ->
+do_request(Url, Method, Headers, Body, Timeout) ->
+    Headers2 = [{"Content-Length", integer_to_list(erlang:size(Body))} | Headers],
+    Request = case Method of
+        get -> {Url, Headers2};
+        _ -> {Url, Headers2, "", Body}
+    end,
+    Options = [{body_format, binary}, {headers_as_is, true}],
+    case httpc:request(Method, Request, [{timeout, Timeout}], Options) of
+        {ok, {{_, 200, _}, ResponseHeaders, ResponseBody}} ->
             {ok, ResponseHeaders, ResponseBody};
-        {ok, {{204, "No Content" ++ _}, _, _}} ->
+        {ok, {{_, 204, "No Content" ++ _}, _, _}} ->
             {ok, not_found};
-        {ok, {{307, "Temporary Redirect" ++ _}, ResponseHeaders, _ResponseBody}} ->
-            {"Location", Location} = lists:keyfind("Location", 1, ResponseHeaders),
-            do_request(Location, Method, Headers, Body, Timeout, Options);
-        {ok, {{404, "Not Found" ++ _}, _, _}} ->
+        {ok, {{_, 404, "Not Found" ++ _}, _, _}} ->
             {ok, not_found};
-        {ok, {Code, _ResponseHeaders, <<>>}} ->
+        {ok, {_, Code, _ResponseHeaders, <<>>}} ->
             {error, Code};
         {ok, {_Code, _ResponseHeaders, _ResponseBody} = ErrorResp} ->
             handle_error_response(ErrorResp);
@@ -167,7 +171,7 @@ do_request(Url, Method, Headers, Body, Timeout, Options) ->
 handle_error_response({Code, _ResponseHeaders, ResponseBody}) ->
     {ErrText, Explanation} = parseErrorXml(ResponseBody),
     case {Code, ErrText} of
-        {{400, _}, "BadDigest"} ->
+        {{_, 400, _}, "BadDigest"} ->
             {error, bad_digest};
         _ ->
             {error, {ErrText, Explanation}}
@@ -236,6 +240,12 @@ stringToSign(Verb, ContentMD5, Date, Bucket, Path, OriginalHeaders) ->
 
 sign(Key,Data) ->
     base64:encode(crypto:hmac(sha, Key, lists:flatten(Data))).
+
+
+to_list(B) when is_binary(B) ->
+    binary_to_list(B);
+to_list(L) ->
+    L.
 
 %%
 %% MD5
