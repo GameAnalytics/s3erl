@@ -190,7 +190,7 @@ handle_request(Req, C, StartTs, Attempts) ->
                     end,
             case Retry of
                 true ->
-                    catch (C#config.retry_callback)(internal_error, Attempts),
+                    catch (C#config.retry_callback)(Error, Attempts),
                     timer:sleep(C#config.retry_delay),
                     handle_request(Req, C, StartTs, Attempts + 1);
                 false ->
