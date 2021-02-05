@@ -10,6 +10,7 @@
           secret_access_key,
           endpoint,
           timeout,
+          connection_timeout,
           retry_callback,
           max_retries,
           retry_delay,

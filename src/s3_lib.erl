@@ -142,7 +142,10 @@ request(Config, Method, Bucket, Path, Headers, Body) ->
                    {"Date", Date},
                    {"Connection", "keep-alive"}
                    | Headers],
-    Options = [{max_connections, Config#config.max_concurrency}],
+    Options = [{max_connections, Config#config.max_concurrency},
+               %% lhttpc uses both connection_timeout and connect_timeout
+               {connection_timeout, Config#config.connection_timeout},
+               {connect_timeout, Config#config.connection_timeout}],
     do_request(Url, Method, FullHeaders, Body, Config#config.timeout, Options).
 
 do_request(Url, Method, Headers, Body, Timeout, Options) ->

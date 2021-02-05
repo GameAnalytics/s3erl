@@ -136,6 +136,7 @@ create_config(Config) ->
     Endpoint         = v(endpoint, Config),
 
     Timeout          = v(timeout, Config, 1500),
+    ConnectionTimeout= v(connection_timeout, Config, infinity),
     RetryCallback    = v(retry_callback, Config,
                          fun ?MODULE:default_retry_cb/2),
     MaxRetries       = v(max_retries, Config, 3),
@@ -151,6 +152,7 @@ create_config(Config) ->
             secret_access_key  = SecretAccessKey,
             endpoint           = Endpoint,
             timeout            = Timeout,
+            connection_timeout = ConnectionTimeout,
             retry_callback     = RetryCallback,
             max_retries        = MaxRetries,
             retry_delay        = RetryDelay,
