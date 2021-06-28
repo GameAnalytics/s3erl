@@ -1,6 +1,7 @@
 .PHONY: deps compile test
 
 REBAR=./rebar
+DOCKER_NETWORK := s3erl
 
 deps:
 	$(REBAR) get-deps
