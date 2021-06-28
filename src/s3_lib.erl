@@ -248,13 +248,17 @@ stringToSign(Verb, ContentMD5, Date, Bucket, Path, OriginalHeaders) ->
 -define(CRYPTO_MAC, false).
 -endif. %% OTP_RELEASE
 
+
+-if(?CRYPTO_MAC > true).
 sign(Key,Data) ->
--if(?CRYPTO_MAC).
-    Mac = crypto:mac(hmac, sha, Key, lists:flatten(Data)).
--else.
-    Mac = crypto:hmac(sha, Key, lists:flatten(Data)).
--endif.
+    Mac = crypto:mac(hmac, sha, Key, lists:flatten(Data)),
     base64:encode(Mac).
+-else.
+sign(Key,Data) ->
+    Mac = crypto:hmac(sha, Key, lists:flatten(Data)),
+    base64:encode(Mac).
+-endif.
+
 
 
 to_list(B) when is_binary(B) ->
