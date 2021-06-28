@@ -238,8 +238,23 @@ stringToSign(Verb, ContentMD5, Date, Bucket, Path, OriginalHeaders) ->
              canonicalizedAmzHeaders(OriginalHeaders)],
     [s3util:string_join(Parts, "\n"), canonicalizedResource(Bucket, Path)].
 
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE < 23).
+-define(CRYPTO_MAC, false).
+-else. %% OTP_RELEASE >= 23
+-define(CRYPTO_MAC, true).
+-endif.
+-else. %% OTP_RELEASE undefined (OTP_RELEASE < 21)
+-define(CRYPTO_MAC, false).
+-endif. %% OTP_RELEASE
+
 sign(Key,Data) ->
-    base64:encode(crypto:mac(hmac, sha, Key, lists:flatten(Data))).
+-if(?CRYPTO_MAC).
+    Mac = crypto:mac(hmac, sha, Key, lists:flatten(Data)).
+-else.
+    Mac = crypto:hmac(sha, Key, lists:flatten(Data)).
+-endif.
+    base64:encode(Mac).
 
 
 to_list(B) when is_binary(B) ->
