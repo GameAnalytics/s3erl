@@ -248,7 +248,7 @@ stringToSign(Verb, ContentMD5, Date, Bucket, Path, OriginalHeaders) ->
 -endif. %% OTP_RELEASE
 
 
--if(?CRYPTO_MAC > true).
+-if(?CRYPTO_MAC == true).
 sign(Key,Data) ->
     Mac = crypto:mac(hmac, sha, Key, lists:flatten(Data)),
     base64:encode(Mac).
