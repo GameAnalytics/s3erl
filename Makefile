@@ -9,7 +9,7 @@ deps:
 compile:
 	$(REBAR) compile
 
-test: compile fakes3
+test: compile docker-deps
 	$(REBAR) eunit skip_deps=true
 
 fakes3:
