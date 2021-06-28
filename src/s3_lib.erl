@@ -239,17 +239,13 @@ stringToSign(Verb, ContentMD5, Date, Bucket, Path, OriginalHeaders) ->
     [s3util:string_join(Parts, "\n"), canonicalizedResource(Bucket, Path)].
 
 -ifdef(OTP_RELEASE).
--if(?OTP_RELEASE < 23).
--define(CRYPTO_MAC, false).
--else. %% OTP_RELEASE >= 23
+-if(?OTP_RELEASE >= 23).
 -define(CRYPTO_MAC, true).
--endif.
--else. %% OTP_RELEASE undefined (OTP_RELEASE < 21)
--define(CRYPTO_MAC, false).
+-endif. %% OTP_RELEASE < 23 (crypto:mac/4 unavailable)
 -endif. %% OTP_RELEASE
 
 
--if(?CRYPTO_MAC == true).
+-ifdef(CRYPTO_MAC).
 sign(Key,Data) ->
     Mac = crypto:mac(hmac, sha, Key, lists:flatten(Data)),
     base64:encode(Mac).
