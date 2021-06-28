@@ -10,6 +10,16 @@
 -include_lib("xmerl/include/xmerl.hrl").
 -include("../include/s3.hrl").
 
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 23).
+-define(CRYPTO_MAC, true).
+-endif. %% OTP_RELEASE < 23 (crypto:mac/4 unavailable)
+
+-if(?OTP_RELEASE >= 21).
+-define(USE_URI_STRING, true).
+-endif. %% OTP_RELEASE < 21 (uri_string module is unavailable)
+-endif. %% OTP_RELEASE
+
 %%
 %% API
 %%
@@ -55,11 +65,21 @@ signed_url(Config, Bucket, Key, Method, Expires) ->
                      stringToSign(Method, "", integer_to_list(Expires),
                                   Bucket, Key, "")),
     Url = build_full_url(Config#config.endpoint, Bucket, Key),
-    SignedUrl = [Url, "?", "AWSAccessKeyId=", Config#config.access_key, "&",
-                 "Expires=", integer_to_list(Expires), "&", "Signature=",
-                 http_uri:encode(binary_to_list(Signature))],
-    lists:flatten(SignedUrl).
+    Query = compose_query(Config#config.access_key, Expires, Signature),
+    lists:flatten([Url, "?", Query]).
 
+
+-ifdef(USE_URI_STRING).
+compose_query(AccessKey, Expires, Signature) ->
+    uri_string:compose_query([{"AWSAccessKeyId", AccessKey},
+                              {"Expires", integer_to_list(Expires)},
+                              {"Signature", binary_to_list(Signature)}]).
+-else.
+compose_query(AccessKey, Expires, Signature) ->
+    lists:flatten(["AWSAccessKeyId=", AccessKey, "&",
+                   "Expires=", integer_to_list(Expires), "&", "Signature=",
+                   http_uri:encode(binary_to_list(Signature))]).
+-endif.
 
 %%
 %% INTERNAL HELPERS
@@ -237,13 +257,6 @@ stringToSign(Verb, ContentMD5, Date, Bucket, Path, OriginalHeaders) ->
     Parts = [VerbString, ContentMD5, ContentType, Date,
              canonicalizedAmzHeaders(OriginalHeaders)],
     [s3util:string_join(Parts, "\n"), canonicalizedResource(Bucket, Path)].
-
--ifdef(OTP_RELEASE).
--if(?OTP_RELEASE >= 23).
--define(CRYPTO_MAC, true).
--endif. %% OTP_RELEASE < 23 (crypto:mac/4 unavailable)
--endif. %% OTP_RELEASE
-
 
 -ifdef(CRYPTO_MAC).
 sign(Key,Data) ->
