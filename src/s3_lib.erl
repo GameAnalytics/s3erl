@@ -238,7 +238,7 @@ stringToSign(Verb, ContentMD5, Date, Bucket, Path, OriginalHeaders) ->
     [s3util:string_join(Parts, "\n"), canonicalizedResource(Bucket, Path)].
 
 sign(Key,Data) ->
-    base64:encode(crypto:hmac(sha, Key, lists:flatten(Data))).
+    base64:encode(crypto:mac(hmac, sha, Key, lists:flatten(Data))).
 
 %%
 %% MD5
