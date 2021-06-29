@@ -133,12 +133,27 @@ listen(Module) ->
     LS.
 
 accept(ssl, ListenSocket) ->
-    {ok, Socket} = ssl:transport_accept(ListenSocket, 10000),
-    ok = ssl:ssl_accept(Socket),
-    Socket;
+    {ok, HSSocket} = ssl:transport_accept(ListenSocket, 10000),
+    ssl_accept(HSSocket);
 accept(Module, ListenSocket) ->
     {ok, Socket} = Module:accept(ListenSocket, 1000),
     Socket.
+
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 21).
+-define(USE_SSL_HANDSHAKE, true).
+-endif. %% OTP_RELEASE => 21
+-endif. %% ifdef OTP_RELEASE
+
+-ifdef(USE_SSL_HANDSHAKE).
+ssl_accept(Socket) ->
+    {ok, SSLSocket} = ssl:handshake(Socket),
+    SSLSocket.
+-else.
+ssl_accept(Socket) ->
+    ok = ssl:ssl_accept(Socket),
+    Socket.
+-endif.
 
 setopts(ssl, Socket, Options) ->
     ssl:setopts(Socket, Options);
