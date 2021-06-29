@@ -260,7 +260,7 @@ stringToSign(Verb, ContentMD5, Date, Bucket, Path, OriginalHeaders) ->
 
 -ifdef(CRYPTO_MAC).
 sign(Key,Data) ->
-    Mac = crypto:mac(hmac, sha, Key, lists:flatten(Data)),
+    Mac = crypto:mac(hmac, sha, Key, Data),
     base64:encode(Mac).
 -else.
 sign(Key,Data) ->
