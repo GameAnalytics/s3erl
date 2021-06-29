@@ -133,9 +133,8 @@ listen(Module) ->
     LS.
 
 accept(ssl, ListenSocket) ->
-    {ok, Socket} = ssl:transport_accept(ListenSocket, 10000),
-    ok = ssl_accept(Socket),
-    Socket;
+    {ok, HSSocket} = ssl:transport_accept(ListenSocket, 10000),
+    ssl_accept(HSSocket);
 accept(Module, ListenSocket) ->
     {ok, Socket} = Module:accept(ListenSocket, 1000),
     Socket.
